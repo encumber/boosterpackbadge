@@ -1,32 +1,38 @@
 // ==UserScript==
-// @name         Steam Badges for Booster Packs
-// @namespace    https://github.com/encumber/boosterpackbadge
-// @version      1.2
-// @description  Injects badge information into the booster creator page
-// @author       Nitoned
+// @name         Steam Badge Info for Booster Creator with favorites list
+// @namespace    http://tampermonkey.net/
+// @version      1.11 // Increased version for improved dropdown width
+// @description  Injects badge information into the booster creator page using a user-defined ID. Includes a favorites list using local storage and Steam-styled controls with improved dropdown width.
+// @author       You
 // @match        https://steamcommunity.com/tradingcards/boostercreator/*
 // @grant        GM_xmlhttpRequest
+// @grant        GM_setValue
+// @grant        GM_getValue
 // ==/UserScript==
 
 // ====================================================================
 // === USER CONFIGURATION - EDIT THESE VALUES BEFORE SAVING SCRIPT ===
 // ====================================================================
 
+// IMPORTANT: Replace the placeholder value below with your actual Steam ID.
+// This can be your custom URL name (e.g., 'myprofile') or your SteamID64 (e.g., '76561198012345678').
+const USER_STEAM_ID = "client"; // <--- PUT YOUR STEAM ID HERE
+
+// steamsets api key for listing all badge icons
+// If you are getting 401 errors, double-check your key on the SteamSets website.
+// It's possible the key expired, was revoked, or you copied it incorrectly.
+const SteamSetsAPI = ""; // <--- PUT YOUR SteamSets API KEY HERE
+
 // Set this to 'true' if the USER_STEAM_ID you entered is a SteamID64.
 // Set this to 'false' if the USER_STEAM_ID you entered is a custom URL name.
 const STEAM_ID_IS_STEAMID64 = false; // <--- SET TO true FOR STEAMID64, false FOR CUSTOM URL NAME
 
-// IMPORTANT: Replace the placeholder value below with your actual Steam ID.
-// This can be your custom URL name (e.g., 'myprofile') or your SteamID64 (e.g., '76561198012345678').
-const USER_STEAM_ID = ""; // <--- PUT YOUR STEAM ID HERE
-
-// steamsets api key for listing all badge icons https://steamsets.com/settings/developer-apps
-const SteamSetsAPI = "";
-
-
 // Set this to 'true' to enable detailed logging messages in your browser's console.
 // Set this to 'false' to disable all console logs from this script.
 const ENABLE_CONSOLE_LOGS = false; // <--- SET TO true OR false FOR LOGGING
+
+// Default sort order for favorites ('appid_asc', 'appid_desc', 'foil_first', 'foil_last')
+let currentFavoritesSortOrder = GM_getValue('favoritesSortOrder', 'appid_asc'); // Load saved sort order
 
 // ====================================================================
 // === END USER CONFIGURATION - DO NOT EDIT BELOW THIS LINE UNLESS ===
@@ -84,33 +90,143 @@ const ENABLE_CONSOLE_LOGS = false; // <--- SET TO true OR false FOR LOGGING
             justify-content: center;
         }
 
-        .badge-list-container {
+        .badge-list-container, .favorites-container {
             display: flex;
-            gap: 20px; /* Smaller gap for the list */
-            margin-bottom: 20px; /* Space above the main container */
+            gap: 20px;
+            margin-bottom: 20px;
             padding: 10px;
             background: rgba(0, 0, 0, 0.2);
             border-radius: 3px;
-            justify-content: center;
-            flex-wrap: wrap; /* Allow wrapping if needed */
+            justify-content: flex-start; /* Align items to the start */
+            flex-wrap: wrap;
+            align-items: flex-start; /* Align rows to the start */
         }
 
-        .badge-box, .badge-list-box {
-            flex: 1;
+        .favorites-container {
+            margin-top: 20px; /* Space above favorites */
+            flex-direction: column; /* Stack controls and items */
+        }
+
+        .favorites-controls {
+             display: flex;
+             gap: 10px;
+             margin-bottom: 10px;
+             align-items: center;
+        }
+
+        .favorites-controls label {
+            color: #B8B6B4;
+            font-size: 12px;
+        }
+
+         /* --- Steam-like Dropdown Styling --- */
+        .favorites-controls .btn_grey_black {
+            padding: 0 8px; /* Adjust padding */
+            height: 24px; /* Adjust height */
+            line-height: 24px; /* Center text vertically */
+            font-size: 12px; /* Match label font size */
+            position: relative; /* Needed for arrow positioning */
+            cursor: pointer;
+            background: linear-gradient( to right, #333, #444 ); /* Darker gradient */
+            border-radius: 3px;
+            border: none; /* Remove default border */
+            color: #B8B6B4;
+            text-shadow: none; /* Remove default text shadow */
+            /* Added min-width to ensure text visibility */
+            min-width: 150px; /* Adjust as needed based on longest option text */
+            display: inline-block; /* Ensure it behaves like a block for width */
+        }
+
+        .favorites-controls .btn_grey_black select {
+            -webkit-appearance: none; /* Remove default dropdown arrow */
+            -moz-appearance: none;
+            appearance: none;
+            background: transparent; /* Make select background transparent */
+            border: none;
+            padding: 0;
+            margin: 0;
+            color: #B8B6B4;
+            font-size: 12px;
+            cursor: pointer;
+            outline: none; /* Remove focus outline */
+            width: 100%; /* Take full width of parent button */
+            height: 100%; /* Take full height of parent button */
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 2; /* Place select above the custom arrow */
+             padding-right: 20px; /* Add padding on the right to make space for the arrow */
+        }
+
+        /* Custom arrow */
+        .favorites-controls .btn_grey_black::after {
+            content: '▼'; /* Unicode down arrow */
+            position: absolute;
+            top: 50%;
+            right: 5px; /* Position arrow */
+            transform: translateY(-50%);
+            font-size: 8px; /* Smaller arrow */
+            color: #B8B6B4;
+            pointer-events: none; /* Allow clicks to pass through to select */
+            z-index: 1; /* Place arrow below select */
+        }
+
+        /* Hover effect for the button */
+        .favorites-controls .btn_grey_black:hover {
+            background: linear-gradient( to right, #444, #555 ); /* Lighter gradient on hover */
+            color: #CFCFCF;
+        }
+
+        /* Focus effect for the button */
+        .favorites-controls .btn_grey_black:focus-within {
+             outline: 1px solid #8BC53F; /* Green outline on focus */
+        }
+
+         .favorites-controls .btn_grey_black option {
+             background-color: #333; /* Background for dropdown options */
+             color: #B8B6B4;
+         }
+
+        /* --- End Steam-like Dropdown Styling --- */
+
+
+        .favorites-items-wrapper {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px; /* Gap between items */
+            width: 100%; /* Take full width of container */
+        }
+
+        .badge-box, .badge-list-box, .favorite-item {
+            flex: 0 0 calc(16.666% - 17px); /* Calculate width for 6 items per row, adjusting for gap */
             text-align: center;
             padding: 15px;
             border-radius: 5px;
             background: rgba(0, 0, 0, 0.1);
-            min-width: 100px; /* Minimum width for list items */
-            max-width: 150px; /* Maximum width for list items */
-            box-sizing: border-box; /* Include padding and border in width */
-            display: flex; /* Use flexbox for vertical alignment */
-            flex-direction: column; /* Stack children vertically */
-            justify-content: space-between; /* Distribute space */
-            align-items: center; /* Center items horizontally */
+            min-width: 100px;
+            max-width: 150px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer; /* Indicate clickable */
+            transition: background-color 0.2s ease; /* Smooth hover effect */
         }
 
-        .badge-box.foil, .badge-list-box.foil {
+         .favorite-item {
+             flex: 0 0 calc(16.666% - 17px); /* Ensure 6 items per row */
+             cursor: pointer;
+         }
+
+        .badge-box:hover, .badge-list-box:hover, .favorite-item:hover {
+            background-color: rgba(255, 255, 255, 0.05); /* Subtle hover effect */
+        }
+
+
+        .badge-box.foil, .badge-list-box.foil, .favorite-item.foil {
             background: linear-gradient(
                 45deg,
                 rgba(0, 0, 0, 0.1) 0%,
@@ -129,53 +245,53 @@ const ENABLE_CONSOLE_LOGS = false; // <--- SET TO true OR false FOR LOGGING
                 background-position: 200% center;
             }
         }
-        .badge-title, .badge-list-title {
+        .badge-title, .badge-list-title, .favorite-title {
             margin-bottom: 10px;
             color: #8BC53F;
             font-weight: bold;
-            font-size: 14px; /* Smaller font for list titles */
-            overflow: hidden; /* Hide overflow text */
-            text-overflow: ellipsis; /* Add ellipsis if text overflows */
-            white-space: nowrap; /* Prevent wrapping */
-            width: 100%; /* Take full width to allow text-overflow */
+            font-size: 14px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            width: 100%;
         }
-        .badge-image, .badge-list-image {
+        .badge-image, .badge-list-image, .favorite-image {
             max-width: 100%;
             height: auto;
             display: block;
-            margin: 0 auto; /* Center images */
-            flex-shrink: 0; /* Prevent image from shrinking */
+            margin: 0 auto;
+            flex-shrink: 0;
         }
-        .badge_empty_circle, .badge_list_empty_circle {
-            width: 80px; /* Smaller size for list */
-            height: 80px; /* Smaller size for list */
+        .badge_empty_circle, .badge_list_empty_circle, .favorite_empty_circle {
+            width: 80px;
+            height: 80px;
             background: rgba(0, 0, 0, 0.2);
             border-radius: 50%;
-            margin: 0 auto; /* Center empty circle */
-             flex-shrink: 0; /* Prevent circle from shrinking */
+            margin: 0 auto;
+             flex-shrink: 0;
         }
 
-        .badge-link, .badge-list-link {
+        .badge-link, .badge-list-link, .favorite-link {
             text-decoration: none;
             color: inherit;
-            display: flex; /* Make the link a flex container */
-            justify-content: center; /* Center children horizontally */
-            align-items: center; /* Center children vertically */
-            width: 100%; /* Make the link take the full width of its parent */
-            min-height: 80px; /* Minimum height for list items */
-            box-sizing: border-box; /* Include padding and border in the element's total width and height */
-            margin-bottom: 5px; /* Space between image/circle and scarcity */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            min-height: 80px;
+            box-sizing: border-box;
+            margin-bottom: 5px;
         }
 
-        .badge-level, .badge-list-scarcity {
+        .badge-level, .badge-list-scarcity, .favorite-appid {
             margin-top: 10px;
             color: #B8B6B4;
-            font-size: 12px; /* Smaller font for list scarcity */
+            font-size: 12px;
         }
         .badge-link:hover, .badge-list-link:hover {
             opacity: 0.8;
         }
-        .foil .badge-title, .foil .badge-list-title {
+        .foil .badge-title, .foil .badge-list-title, .foil .favorite-title {
             color: #CFE6F5;
             text-shadow: 0 0 5px rgba(207, 230, 245, 0.5);
         }
@@ -192,9 +308,9 @@ const ENABLE_CONSOLE_LOGS = false; // <--- SET TO true OR false FOR LOGGING
         .foil .badge-sets {
             color: #CFE6F5;
         }
-        .badge-list-scarcity {
-            margin-top: auto; /* Push scarcity to the bottom */
-            font-size: 11px; /* Even smaller font */
+        .badge-list-scarcity, .favorite-appid {
+            margin-top: auto;
+            font-size: 11px;
             color: #B8B6B4;
         }
 
@@ -281,7 +397,6 @@ const ENABLE_CONSOLE_LOGS = false; // <--- SET TO true OR false FOR LOGGING
         if (badgeData.badgeUrl) {
             link.href = badgeData.badgeUrl;
         } else {
-             link.href = '#';
              link.style.cursor = 'default';
         }
 
@@ -335,6 +450,11 @@ const ENABLE_CONSOLE_LOGS = false; // <--- SET TO true OR false FOR LOGGING
     function createBadgeListItem(badgeData) {
         const badgeListBox = document.createElement('div');
         badgeListBox.className = `badge-list-box ${badgeData.isFoil ? 'foil' : ''}`;
+        // Store data attributes for easy access when clicking
+        badgeListBox.dataset.appid = badgeData.appId;
+        badgeListBox.dataset.badgeImage = badgeData.badgeImage;
+        badgeListBox.dataset.isFoil = badgeData.isFoil;
+        badgeListBox.dataset.name = badgeData.name || 'Unknown Badge';
 
         const title = document.createElement('div');
         title.className = 'badge-list-title';
@@ -343,42 +463,36 @@ const ENABLE_CONSOLE_LOGS = false; // <--- SET TO true OR false FOR LOGGING
 
         const link = document.createElement('a');
         link.className = 'badge-list-link';
-        link.href = '#'; // Keep non-clickable as API doesn't provide a direct badge page link
-        link.style.cursor = 'default';
+        link.style.cursor = 'pointer'; // Make it look clickable
 
-        // --- CONSTRUCT IMAGE URL FROM API DATA ---
         let badgeImageUrl = null;
-        // Check if appId and badgeImage are available and are strings/numbers
         if (badgeData.appId && badgeData.badgeImage &&
             (typeof badgeData.appId === 'number' || typeof badgeData.appId === 'string') &&
             typeof badgeData.badgeImage === 'string' && badgeData.badgeImage.length > 0) {
 
             badgeImageUrl = `https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/items/${badgeData.appId}/${badgeData.badgeImage}`;
-            logDebug(`Constructed image URL for list item: ${badgeImageUrl}`);
+            badgeListBox.dataset.imageUrl = badgeImageUrl; // Store image URL
 
             const image = document.createElement('img');
             image.className = 'badge-list-image';
             image.src = badgeImageUrl;
-            image.alt = badgeData.name || 'Badge Image'; // Add alt text
-            // Optional: Add an error listener to see if the image fails to load
+            image.alt = badgeData.name || 'Badge Image';
             image.onerror = () => {
                 logError(`Failed to load constructed image for badge list item: ${badgeData.name} from URL: ${badgeImageUrl}`);
-                // Replace with empty circle if image fails
-                link.innerHTML = ''; // Clear any failed image
+                link.innerHTML = '';
                 const emptyCircle = document.createElement('div');
                 emptyCircle.className = 'badge_list_empty_circle';
                 link.appendChild(emptyCircle);
+                 badgeListBox.dataset.imageUrl = ''; // Clear failed image URL
             };
             link.appendChild(image);
 
         } else {
-             logDebug(`Insufficient data (appId or badgeImage) from API to construct image URL for badge: ${badgeData.name}. Using empty circle.`);
             const emptyCircle = document.createElement('div');
             emptyCircle.className = 'badge_list_empty_circle';
             link.appendChild(emptyCircle);
+             badgeListBox.dataset.imageUrl = ''; // Store empty image URL
         }
-        // --- END CONSTRUCT IMAGE URL ---
-
 
         badgeListBox.appendChild(link);
 
@@ -386,44 +500,260 @@ const ENABLE_CONSOLE_LOGS = false; // <--- SET TO true OR false FOR LOGGING
         if (badgeData.scarcity !== undefined && badgeData.scarcity !== null) {
             const scarcity = document.createElement('div');
             scarcity.className = 'badge-list-scarcity';
-            scarcity.textContent = `Scarcity: ${badgeData.scarcity}`;
+             // Only show scarcity for non-foil badges as foil scarcity isn't directly comparable
+             if (!badgeData.isFoil) {
+                 scarcity.textContent = `Scarcity: ${badgeData.scarcity}`;
+             } else {
+                 scarcity.textContent = `Foil Badge`; // Indicate it's foil instead of scarcity
+                 scarcity.style.color = '#CFE6F5';
+             }
             badgeListBox.appendChild(scarcity);
         } else {
-            // Add a placeholder if scarcity is missing
             const scarcity = document.createElement('div');
             scarcity.className = 'badge-list-scarcity';
-            scarcity.textContent = `Scarcity: N/A`;
+            scarcity.textContent = badgeData.isFoil ? 'Foil Badge' : 'Scarcity: N/A';
              scarcity.style.fontStyle = 'italic';
-             scarcity.style.color = '#666';
+             scarcity.style.color = badgeData.isFoil ? '#CFE6F5' : '#666';
             badgeListBox.appendChild(scarcity);
         }
 
 
+        // Add click listener to save/remove from favorites
+        badgeListBox.addEventListener('click', () => {
+            toggleFavorite({
+                appId: badgeData.appId,
+                name: badgeData.name || 'Unknown Badge',
+                imageUrl: badgeListBox.dataset.imageUrl, // Use stored URL
+                isFoil: badgeData.isFoil
+            });
+        });
+
+
         return badgeListBox;
+    }
+
+     function createFavoriteItemElement(favoriteData) {
+        const favoriteItem = document.createElement('div');
+        favoriteItem.className = `favorite-item ${favoriteData.isFoil ? 'foil' : ''}`;
+        favoriteItem.dataset.appid = favoriteData.appId;
+        favoriteItem.dataset.isFoil = favoriteData.isFoil;
+
+        const title = document.createElement('div');
+        title.className = 'favorite-title';
+        title.textContent = favoriteData.name || `App ${favoriteData.appId}`;
+        favoriteItem.appendChild(title);
+
+        const link = document.createElement('a');
+        link.className = 'favorite-link';
+        link.href = `#/tradingcards/boostercreator/${favoriteData.appId}`; // Set the URL hash
+        link.addEventListener('click', (event) => {
+            event.preventDefault(); // Prevent default link behavior
+            // Change the URL hash without a full page reload
+            window.location.hash = `/tradingcards/boostercreator/${favoriteData.appId}`;
+             // Manually trigger the update as hash change might not trigger MutationObserver reliably across all browsers/frameworks
+            setTimeout(updateBadgeInfo, 100); // Add a small delay
+        });
+
+
+        if (favoriteData.imageUrl) {
+            const image = document.createElement('img');
+            image.className = 'favorite-image';
+            image.src = favoriteData.imageUrl;
+            image.alt = favoriteData.name || 'Badge Image';
+             image.onerror = () => {
+                logError(`Failed to load image for favorite item: ${favoriteData.name} from URL: ${favoriteData.imageUrl}`);
+                link.innerHTML = ''; // Clear any failed image
+                const emptyCircle = document.createElement('div');
+                emptyCircle.className = 'favorite_empty_circle';
+                link.appendChild(emptyCircle);
+            };
+            link.appendChild(image);
+        } else {
+            const emptyCircle = document.createElement('div');
+            emptyCircle.className = 'favorite_empty_circle';
+            link.appendChild(emptyCircle);
+        }
+
+        favoriteItem.appendChild(link);
+
+        const appidElement = document.createElement('div');
+        appidElement.className = 'favorite-appid';
+        appidElement.textContent = `App ID: ${favoriteData.appId}`;
+         if (favoriteData.isFoil) {
+             const foilIndicator = document.createElement('span');
+             foilIndicator.textContent = ' (Foil)';
+             foilIndicator.style.color = '#CFE6F5';
+             appidElement.appendChild(foilIndicator);
+         }
+        favoriteItem.appendChild(appidElement);
+
+         // Add click listener to remove from favorites when clicked again
+        favoriteItem.addEventListener('click', (event) => {
+             // Only remove if the click wasn't on the link itself
+            if (!event.target.closest('.favorite-link')) {
+                 toggleFavorite({
+                     appId: favoriteData.appId,
+                     name: favoriteData.name,
+                     imageUrl: favoriteData.imageUrl,
+                     isFoil: favoriteData.isFoil
+                 });
+            }
+        });
+
+
+        return favoriteItem;
+    }
+
+
+     function getFavorites() {
+        try {
+            const favoritesJson = GM_getValue('steamBadgeFavorites', '[]');
+            return JSON.parse(favoritesJson);
+        } catch (e) {
+            logError('Error parsing favorites from local storage:', e);
+            return [];
+        }
+    }
+
+    function saveFavorites(favorites) {
+        try {
+            GM_setValue('steamBadgeFavorites', JSON.stringify(favorites));
+            logDebug('Favorites saved:', favorites);
+        } catch (e) {
+            logError('Error saving favorites to local storage:', e);
+        }
+    }
+
+    function toggleFavorite(badgeData) {
+        logDebug('Toggling favorite:', badgeData);
+        const favorites = getFavorites();
+        const index = favorites.findIndex(fav =>
+            fav.appId === badgeData.appId && fav.isFoil === badgeData.isFoil
+        );
+
+        if (index > -1) {
+            // Item is already in favorites, remove it
+            favorites.splice(index, 1);
+            log(`Removed favorite: App ID ${badgeData.appId}, Foil: ${badgeData.isFoil}`);
+        } else {
+            // Item is not in favorites, add it
+             // Ensure we don't add duplicates based on appId and isFoil
+             if (!favorites.some(fav => fav.appId === badgeData.appId && fav.isFoil === badgeData.isFoil)) {
+                 favorites.push(badgeData);
+                 log(`Added favorite: App ID ${badgeData.appId}, Foil: ${badgeData.isFoil}`);
+             } else {
+                 logDebug(`Attempted to add duplicate favorite: App ID ${badgeData.appId}, Foil: ${badgeData.isFoil}`);
+             }
+        }
+
+        saveFavorites(favorites);
+        displayFavorites(); // Refresh the displayed list
+    }
+
+     function sortFavorites(favorites, order) {
+        switch (order) {
+            case 'appid_asc':
+                return favorites.sort((a, b) => parseInt(a.appId) - parseInt(b.appId));
+            case 'appid_desc':
+                return favorites.sort((a, b) => parseInt(b.appId) - parseInt(a.appId));
+            case 'foil_first':
+                return favorites.sort((a, b) => {
+                    if (a.isFoil !== b.isFoil) {
+                        return a.isFoil ? 1 : -1; // false (non-foil) comes before true (foil)
+                    }
+                    return parseInt(a.appId) - parseInt(b.appId); // Secondary sort by appid
+                });
+            case 'foil_last':
+                 return favorites.sort((a, b) => {
+                    if (a.isFoil !== b.isFoil) {
+                        return a.isFoil ? -1 : 1; // true (foil) comes before false (non-foil)
+                    }
+                    return parseInt(a.appId) - parseInt(b.appId); // Secondary sort by appid
+                });
+            default:
+                return favorites; // Default to appid_asc if unknown order
+        }
+     }
+
+
+    function displayFavorites() {
+        logDebug('Displaying favorites...');
+        const favoritesContainer = document.querySelector('.favorites-container');
+        if (!favoritesContainer) {
+            logWarn('Favorites container not found. Cannot display favorites.');
+            return;
+        }
+
+        // Find or create the items wrapper
+        let itemsWrapper = favoritesContainer.querySelector('.favorites-items-wrapper');
+        if (!itemsWrapper) {
+            itemsWrapper = document.createElement('div');
+            itemsWrapper.className = 'favorites-items-wrapper';
+            favoritesContainer.appendChild(itemsWrapper);
+        }
+         itemsWrapper.innerHTML = ''; // Clear current items
+
+        const favorites = getFavorites();
+         const sortedFavorites = sortFavorites([...favorites], currentFavoritesSortOrder); // Sort a copy
+
+        if (sortedFavorites.length === 0) {
+            itemsWrapper.textContent = 'No favorites added yet.';
+             itemsWrapper.style.color = '#B8B6B4';
+             itemsWrapper.style.textAlign = 'center';
+             itemsWrapper.style.width = '100%';
+             itemsWrapper.style.marginTop = '10px';
+        } else {
+             itemsWrapper.style.color = ''; // Reset styles
+             itemsWrapper.style.textAlign = '';
+             itemsWrapper.style.width = '';
+             itemsWrapper.style.marginTop = '';
+            sortedFavorites.forEach(fav => {
+                itemsWrapper.appendChild(createFavoriteItemElement(fav));
+            });
+        }
+         logDebug(`Displayed ${sortedFavorites.length} favorites.`);
     }
 
 
     async function fetchAndDisplayBadgeList(appId) {
          if (!SteamSetsAPI || SteamSetsAPI === "ss_YOUR_API_KEY") {
             logWarn("SteamSets API key not configured or is placeholder. Skipping badge list fetch.");
+            let badgeListContainer = document.querySelector('.badge-list-container');
+            if (!badgeListContainer) {
+                 badgeListContainer = document.createElement('div');
+                 badgeListContainer.className = 'badge-list-container';
+                 const target = document.querySelector('.booster_creator_left');
+                  if (target) {
+                     target.insertAdjacentElement('afterend', badgeListContainer);
+                 }
+            }
+            if (badgeListContainer) {
+                 badgeListContainer.innerHTML = '';
+                 badgeListContainer.textContent = 'SteamSets API key is not set. Badge list unavailable.';
+                 badgeListContainer.style.color = 'orange';
+                 badgeListContainer.style.textAlign = 'center';
+            }
             return;
         }
 
         log(`Fetching badge list for App ID: ${appId} from SteamSets API.`);
 
-        const badgeListContainer = document.createElement('div');
-        badgeListContainer.className = 'badge-list-container';
+        let badgeListContainer = document.querySelector('.badge-list-container');
+         if (!badgeListContainer) {
+             badgeListContainer = document.createElement('div');
+             badgeListContainer.className = 'badge-list-container';
+             const target = document.querySelector('.booster_creator_left');
+              if (target) {
+                 target.insertAdjacentElement('afterend', badgeListContainer);
+             } else {
+                 logWarn('Target element .booster_creator_left not found for badge list container insertion.');
+                 return;
+             }
+         }
+
+        badgeListContainer.innerHTML = ''; // Clear previous content
         // Temporarily add a loading message
         badgeListContainer.textContent = 'Loading available badges...';
-
-        const target = document.querySelector('.booster_creator_left');
-         if (!target) {
-            logWarn('Target element .booster_creator_left not found for badge list.');
-            return;
-        }
-
-        // Add the list container *before* the main badge container
-        target.insertAdjacentElement('afterend', badgeListContainer);
 
 
         GM_xmlhttpRequest({
@@ -444,38 +774,28 @@ const ENABLE_CONSOLE_LOGS = false; // <--- SET TO true OR false FOR LOGGING
                     try {
                         const data = JSON.parse(response.responseText);
 
-                        // --- DEBUGGING: Log the full API response data ---
-                        logAPIData('Full SteamSets API Response Data:', data);
-                        // --- END DEBUGGING ---
-
-
                         if (data && data.badges && Array.isArray(data.badges)) {
                             log(`Fetched ${data.badges.length} badges from SteamSets API.`);
 
-                            // Sort badges
+                            // Sort badges (non-foil by scarcity asc, then foil by rarity asc)
                             const sortedBadges = data.badges.sort((a, b) => {
-                                // isFoil false first
                                 if (a.isFoil !== b.isFoil) {
-                                    return a.isFoil ? 1 : -1; // false comes before true
+                                    return a.isFoil ? 1 : -1; // non-foil first
                                 }
-                                // Then by highestLevel low to high for non-foil
-                                if (!a.isFoil && !b.isFoil) {
-                                    return (a.highestLevel || 0) - (b.highestLevel || 0);
+                                // For same type (foil or non-foil), sort by scarcity ascending
+                                // Use rarity for foil as scarcity might not be available or comparable
+                                if (a.isFoil) {
+                                     return (a.rarity || Infinity) - (b.rarity || Infinity);
                                 }
-                                // For foil (which will be grouped at the end), sort by highestLevel low to high
-                                if (a.isFoil && b.isFoil) {
-                                     return (a.highestLevel || 0) - (b.highestLevel || 0);
-                                }
-                                return 0; // Should not reach here
+                                return (a.scarcity || Infinity) - (b.scarcity || Infinity);
                             });
 
-                            // Take the first 6 sorted badges
-                            const top6Badges = sortedBadges.slice(0, 6);
 
-                            if (top6Badges.length > 0) {
-                                log(`Displaying top ${top6Badges.length} badges:`);
-                                logTable(top6Badges); // Log the actual badge data received
-                                top6Badges.forEach(badge => {
+                            if (sortedBadges.length > 0) {
+                                log(`Displaying all available badges (${sortedBadges.length}):`);
+                                sortedBadges.forEach(badge => {
+                                    // Add appId to the badge data before creating the item
+                                    badge.appId = appId;
                                     badgeListContainer.appendChild(createBadgeListItem(badge));
                                 });
                             } else {
@@ -485,12 +805,23 @@ const ENABLE_CONSOLE_LOGS = false; // <--- SET TO true OR false FOR LOGGING
                         } else {
                             logError('SteamSets API response did not contain expected badge data structure:', data);
                             badgeListContainer.textContent = 'Error fetching badge list: Invalid data format.';
+                             badgeListContainer.style.color = 'orange';
+                             badgeListContainer.style.textAlign = 'center';
                         }
                     } catch (e) {
                         logError('Error parsing SteamSets API response:', e);
                         badgeListContainer.textContent = 'Error fetching badge list: Invalid JSON response.';
+                         badgeListContainer.style.color = 'orange';
+                         badgeListContainer.style.textAlign = 'center';
                     }
-                } else {
+                } else if (response.status === 401) {
+                     logError(`SteamSets API request failed with status 401 (Unauthorized). Check your API key.`, response.responseText);
+                     badgeListContainer.innerHTML = '';
+                     badgeListContainer.textContent = 'SteamSets API Error: Unauthorized (401). Please check your API key configuration.';
+                     badgeListContainer.style.color = 'red';
+                     badgeListContainer.style.textAlign = 'center';
+                }
+                else {
                      logError(`SteamSets API request failed with status: ${response.status}`, response.responseText);
                      let errorMessage = `Error fetching badge list. Status: ${response.status}.`;
                      if (response.responseText) {
@@ -503,13 +834,18 @@ const ENABLE_CONSOLE_LOGS = false; // <--- SET TO true OR false FOR LOGGING
                              // Ignore JSON parsing error if responseText is not JSON
                          }
                      }
+                    badgeListContainer.innerHTML = '';
                     badgeListContainer.textContent = errorMessage;
+                     badgeListContainer.style.color = 'orange';
+                     badgeListContainer.style.textAlign = 'center';
                 }
             },
             onerror: (error) => {
                 logError(`SteamSets API request failed:`, error);
                 badgeListContainer.innerHTML = ''; // Clear loading message
                 badgeListContainer.textContent = `Network error fetching badge list.`;
+                 badgeListContainer.style.color = 'red';
+                 badgeListContainer.style.textAlign = 'center';
             }
         });
     }
@@ -519,69 +855,73 @@ const ENABLE_CONSOLE_LOGS = false; // <--- SET TO true OR false FOR LOGGING
     async function updateBadgeInfo() {
         const appId = getAppId();
         if (!appId) {
-            logWarn('Could not get App ID from URL.');
+            logWarn('Could not get App ID from URL. Displaying favorites only.');
+            // If no App ID, clear badge containers and only show favorites
+            clearBadgeContainers(false); // Don't remove favorites container
+            addFavoritesContainerWithControls(); // Ensure favorites container is present
+            displayFavorites();
             return;
         }
 
-        // Use the hardcoded values directly from the top-level config
         const userId = USER_STEAM_ID;
         const isSteamId64 = STEAM_ID_IS_STEAMID64;
 
-        // Basic check to ensure the user has updated the placeholder
-        if (userId === "REPLACE_WITH_YOUR_STEAM_ID") {
-            logError("Please update the USER_STEAM_ID variable in the script with your Steam ID.");
+        if (userId === "REPLACE_WITH_YOUR_STEAM_ID" || SteamSetsAPI === "ss_YOUR_API_KEY") {
+            logError("Please update the USER_STEAM_ID and/or SteamSetsAPI variables in the script.");
             const errorDiv = document.createElement('div');
             errorDiv.style.cssText = 'color: red; font-weight: bold; margin-top: 20px; text-align: center;';
-            errorDiv.textContent = "Steam Badge Info Injector: Please edit the script and replace 'REPLACE_WITH_YOUR_STEAM_ID' with your actual Steam ID.";
+            errorDiv.textContent = "Steam Badge Info Injector: Please edit the script and update the configuration variables.";
             const target = document.querySelector('.booster_creator_left');
             if (target) {
                  target.insertAdjacentElement('afterend', errorDiv);
             } else {
                  document.body.prepend(errorDiv);
             }
+            clearBadgeContainers(false); // Clear any old containers except favorites
+            addFavoritesContainerWithControls(); // Ensure favorites container is present
+            displayFavorites(); // Still show favorites if available
             return;
         }
 
-        // Remove existing containers before adding new ones
-        const existingMainContainer = document.querySelector('.badge-container');
-        if (existingMainContainer) {
-            existingMainContainer.remove();
-        }
-        const existingListContainer = document.querySelector('.badge-list-container');
-         if (existingListContainer) {
-            existingListContainer.remove();
-        }
-         const existingError = document.querySelector('div[style*="color: red"]');
-        if(existingError) {
-            existingError.remove();
-        }
-
+        // Remove existing containers before adding new ones (except favorites)
+        clearBadgeContainers(true); // Remove badge containers
 
         log(`Fetching badge data for App ID: ${appId} and User ID: ${userId} (Type: ${isSteamId64 ? 'SteamID64' : 'Custom ID'})`);
 
         // Fetch and display the list of available badges first
         fetchAndDisplayBadgeList(appId);
 
-
+        // Create and insert the main badge container
         const container = document.createElement('div');
         container.className = 'badge-container';
-        // Add a temporary loading state for the main badge container
-        container.textContent = 'Loading your badge info...';
+        container.textContent = 'Loading your badge info...'; // Loading state
 
 
         const target = document.querySelector('.booster_creator_left');
          if (!target) {
             logWarn('Target element .booster_creator_left not found. Main badge container not inserted.');
+             // Still display favorites even if main container fails
+             addFavoritesContainerWithControls(); // Ensure favorites container is present
+             displayFavorites();
              return;
         }
-        // Insert the main container after the list container (which is already inserted after target)
-        // Or, if list container wasn't inserted, insert directly after target.
-        const listContainerCheck = document.querySelector('.badge-list-container');
+
+        // Create and insert the favorites container if it doesn't exist
+        addFavoritesContainerWithControls();
+
+
+        // Insert the main container after the badge list container
+         const listContainerCheck = document.querySelector('.badge-list-container');
          if (listContainerCheck) {
-            listContainerCheck.insertAdjacentElement('afterend', container);
+            listContainerCheck.insertAdjacentElement('afterend', container); // Insert main container after list
          } else {
+            // Fallback if list container wasn't added
             target.insertAdjacentElement('afterend', container);
          }
+
+
+         // Always display favorites when updateBadgeInfo runs
+         displayFavorites();
 
 
         // Construct URLs using the provided user ID and type
@@ -630,9 +970,94 @@ const ENABLE_CONSOLE_LOGS = false; // <--- SET TO true OR false FOR LOGGING
         });
     }
 
-    addStyle(style);
+     function clearBadgeContainers(removeFavorites = false) {
+         const existingMainContainer = document.querySelector('.badge-container');
+         if (existingMainContainer) {
+             existingMainContainer.remove();
+         }
+         const existingListContainer = document.querySelector('.badge-list-container');
+         if (existingListContainer) {
+             existingListContainer.remove();
+         }
+         if (removeFavorites) {
+              const existingFavoritesContainer = document.querySelector('.favorites-container');
+              if (existingFavoritesContainer) {
+                  existingFavoritesContainer.remove();
+              }
+         }
+         const existingError = document.querySelector('div[style*="color: red"]');
+         if(existingError) {
+             existingError.remove();
+         }
+     }
+
+      function addFavoritesContainerWithControls() {
+         let favoritesContainer = document.querySelector('.favorites-container');
+         if (!favoritesContainer) {
+              favoritesContainer = document.createElement('div');
+              favoritesContainer.className = 'favorites-container';
+
+              // Add sort controls
+              const controlsDiv = document.createElement('div');
+              controlsDiv.className = 'favorites-controls';
+
+              const label = document.createElement('label');
+              label.textContent = 'Sort Favorites:';
+              label.htmlFor = 'favorites-sort';
+              controlsDiv.appendChild(label);
+
+              // Create the button wrapper for the select
+              const selectWrapper = document.createElement('div');
+              selectWrapper.className = 'btn_grey_black'; // Apply Steam button class
+
+              const select = document.createElement('select');
+              select.id = 'favorites-sort';
+              select.innerHTML = `
+                 <option value="appid_asc">App ID (Asc)</option>
+                 <option value="appid_desc">App ID (Desc)</option>
+                 <option value="foil_first">Foil Last</option>
+                 <option value="foil_last">Foil First</option>
+              `;
+              select.value = currentFavoritesSortOrder; // Set initial value
+              select.addEventListener('change', (event) => {
+                  currentFavoritesSortOrder = event.target.value;
+                  GM_setValue('favoritesSortOrder', currentFavoritesSortOrder); // Save sort order
+                  displayFavorites(); // Redraw favorites with new sort order
+              });
+              selectWrapper.appendChild(select); // Append select inside the button wrapper
+              controlsDiv.appendChild(selectWrapper); // Append button wrapper to controls
+
+              favoritesContainer.appendChild(controlsDiv);
+
+              // Find a suitable insertion point
+              const mainContainer = document.querySelector('.badge-container');
+              const listContainer = document.querySelector('.badge-list-container');
+              const target = document.querySelector('.booster_creator_left');
+
+              if (mainContainer) {
+                  mainContainer.insertAdjacentElement('afterend', favoritesContainer);
+              } else if (listContainer) {
+                  listContainer.insertAdjacentElement('afterend', favoritesContainer);
+              } else if (target) {
+                  target.insertAdjacentElement('afterend', favoritesContainer);
+              } else {
+                  logWarn('Could not find insertion point for favorites container.');
+                  return; // Don't proceed if no target found
+              }
+              logDebug('Favorites container and controls re-added.');
+         } else {
+             // If container exists, just ensure the sort select value is correct
+              const sortSelect = favoritesContainer.querySelector('#favorites-sort');
+              if (sortSelect) {
+                  sortSelect.value = currentFavoritesSortOrder;
+              }
+         }
+     }
+
 
     // --- Initial Run and Observers ---
+
+    addStyle(style);
 
     // Use a small delay to allow the page structure to load
     setTimeout(updateBadgeInfo, 500);
@@ -642,11 +1067,37 @@ const ENABLE_CONSOLE_LOGS = false; // <--- SET TO true OR false FOR LOGGING
     let lastUrl = window.location.href;
     const observer = new MutationObserver(() => {
         const currentUrl = window.location.href;
-        if (currentUrl !== lastUrl) {
+        // Check if the appId part of the URL has changed
+        const lastAppId = lastUrl.match(/\d+$/);
+        const currentAppId = currentUrl.match(/\d+$/);
+
+        const appIdChanged = (lastAppId && currentAppId && lastAppId[0] !== currentAppId[0]) ||
+                             (!lastAppId && currentAppId) ||
+                             (lastAppId && !currentAppId);
+
+        if (currentUrl !== lastUrl && appIdChanged) {
             lastUrl = currentUrl;
-            log(`URL changed to: ${currentUrl}. Updating badge info.`);
+            log(`URL changed, App ID updated. Updating badge info.`);
             // Add a small delay before updating to ensure the page structure is ready
             setTimeout(updateBadgeInfo, 200);
+        } else if (currentUrl !== lastUrl && !appIdChanged) {
+             // If URL changed but App ID is the same (e.g., hash change for something else),
+             // just re-display favorites in case the container was removed by page script.
+             log(`URL changed, but App ID is the same. Redisplaying favorites.`);
+             lastUrl = currentUrl; // Still update lastUrl
+             // Ensure the favorites container exists before trying to display
+             if (!document.querySelector('.favorites-container')) {
+                 logDebug('Favorites container missing during non-AppID URL change, attempting to re-add.');
+                 addFavoritesContainerWithControls(); // Re-add container if necessary
+             }
+             setTimeout(displayFavorites, 100); // Always try to display favorites
+        } else if (currentUrl === lastUrl) {
+             // Check if the favorites container needs to be re-added
+             if (!document.querySelector('.favorites-container')) {
+                 logDebug('Favorites container missing, re-adding.');
+                 addFavoritesContainerWithControls(); // Re-add container and controls
+                 displayFavorites(); // Populate the re-added container
+             }
         }
     });
 
@@ -658,5 +1109,12 @@ const ENABLE_CONSOLE_LOGS = false; // <--- SET TO true OR false FOR LOGGING
         log('DOMContentLoaded event fired.');
         setTimeout(updateBadgeInfo, 300);
     });
+
+    // Initial display of favorites on load
+    setTimeout(() => {
+         addFavoritesContainerWithControls(); // Ensure container is present early
+         displayFavorites();
+    }, 100);
+
 
 })();
