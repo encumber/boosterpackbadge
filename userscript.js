@@ -545,11 +545,11 @@ let currentFavoritesSortOrder = GM_getValue('favoritesSortOrder', 'appid_asc'); 
 
         const link = document.createElement('a');
         link.className = 'favorite-link';
-        link.href = `#/tradingcards/boostercreator/${favoriteData.appId}`; // Set the URL hash
+        link.href = `#${favoriteData.appId}`; // Set the URL hash
         link.addEventListener('click', (event) => {
             event.preventDefault(); // Prevent default link behavior
             // Change the URL hash without a full page reload
-            window.location.hash = `/tradingcards/boostercreator/${favoriteData.appId}`;
+            window.location.hash = `${favoriteData.appId}`;
              // Manually trigger the update as hash change might not trigger MutationObserver reliably across all browsers/frameworks
             setTimeout(updateBadgeInfo, 100); // Add a small delay
         });
