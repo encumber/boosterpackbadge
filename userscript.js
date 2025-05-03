@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Steam Badge Info for Booster Creator with favorites list
-// @namespace    http://tampermonkey.net/
+// @namespace    https://github.com/encumber/
 // @version      1.11 // Increased version for improved dropdown width
 // @description  Injects badge information into the booster creator page using a user-defined ID. Includes a favorites list using local storage and Steam-styled controls with improved dropdown width.
-// @author       You
+// @author       Nitoned
 // @match        https://steamcommunity.com/tradingcards/boostercreator/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_setValue
