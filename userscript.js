@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Steam Badge Info for Booster Creator with favorites list
-// @namespace    https://github.com/encumber
-// @version      1.12 // Increased version for the fix
+// @namespace    https://github.com/encumber/
+// @version      1.14 // Increased version for the sorting and level display
 // @description  Injects badge information into the booster creator page using a user-defined ID. Includes a favorites list using local storage and Steam-styled controls with improved dropdown width.
 // @author       Nitoned
 // @match        https://steamcommunity.com/tradingcards/boostercreator/*
@@ -288,6 +288,15 @@ let currentFavoritesSortOrder = GM_getValue('favoritesSortOrder', 'appid_asc'); 
             color: #B8B6B4;
             font-size: 12px;
         }
+         .badge-list-level { /* New style for level in the list */
+            margin-top: 4px;
+            color: #8BC53F;
+            font-size: 11px;
+         }
+         .foil .badge-list-level {
+             color: #CFE6F5;
+         }
+
         .badge-link:hover, .badge-list-link:hover {
             opacity: 0.8;
         }
@@ -496,25 +505,27 @@ let currentFavoritesSortOrder = GM_getValue('favoritesSortOrder', 'appid_asc'); 
 
         badgeListBox.appendChild(link);
 
-        // Use badgeData.scarcity directly from the API response
+        // Display scarcity
+        const scarcity = document.createElement('div');
+        scarcity.className = 'badge-list-scarcity';
         if (badgeData.scarcity !== undefined && badgeData.scarcity !== null) {
-            const scarcity = document.createElement('div');
-            scarcity.className = 'badge-list-scarcity';
-             // Only show scarcity for non-foil badges as foil scarcity isn't directly comparable
-             if (!badgeData.isFoil) {
-                 scarcity.textContent = `Scarcity: ${badgeData.scarcity.toFixed(0)}`; // Format scarcity to 2 decimal places
-             } else {
-                 scarcity.textContent = `Scarcity: ${badgeData.scarcity.toFixed(0)}`; // Indicate it's foil instead of scarcity
-                 scarcity.style.color = '#CFE6F5';
+            scarcity.textContent = `Scarcity: ${badgeData.scarcity.toFixed(0)}`; // Format scarcity to 2 decimal places
+             if (badgeData.isFoil) {
+                 scarcity.style.color = '#CFE6F5'; // Foil color for foil scarcity
              }
-            badgeListBox.appendChild(scarcity);
         } else {
-            const scarcity = document.createElement('div');
-            scarcity.className = 'badge-list-scarcity';
-            scarcity.textContent = badgeData.isFoil ? 'Foil Badge' : 'Scarcity: N/A';
+             scarcity.textContent = badgeData.isFoil ? 'Scarcity (Foil): N/A' : 'Scarcity: N/A'; // Indicate foil or N/A
              scarcity.style.fontStyle = 'italic';
-             scarcity.style.color = badgeData.isFoil ? '#CFE6F5' : '#666';
-            badgeListBox.appendChild(scarcity);
+             scarcity.style.color = badgeData.isFoil ? '#CFE6F5' : '#666'; // Foil color or grey for N/A
+        }
+        badgeListBox.appendChild(scarcity);
+
+        // Display level for non-foil badges if available
+        if (!badgeData.isFoil && badgeData.highestLevel !== undefined && badgeData.highestLevel !== null) {
+            const level = document.createElement('div');
+            level.className = 'badge-list-level';
+            level.textContent = `Level ${badgeData.highestLevel}`;
+            badgeListBox.appendChild(level);
         }
 
 
@@ -778,25 +789,45 @@ let currentFavoritesSortOrder = GM_getValue('favoritesSortOrder', 'appid_asc'); 
                             log(`Fetched ${data.badges.length} badges from SteamSets API.`);
                             logAPIData('Raw badge data from API:', data.badges);
 
-                            // Sort badges (non-foil by scarcity asc, then foil by rarity asc)
+                            // Sort badges
                             const sortedBadges = data.badges.sort((a, b) => {
+                                // Sort non-foil badges first
                                 if (a.isFoil !== b.isFoil) {
                                     return a.isFoil ? 1 : -1; // non-foil first
                                 }
-                                // For same type (foil or non-foil), sort by scarcity ascending
-                                // Use rarity for foil as scarcity might not be available or comparable
-                                if (a.isFoil) {
-                                     // Sort foil badges by rarity ascending if available, otherwise by name
-                                     if (a.rarity !== undefined && b.rarity !== undefined) {
-                                         return a.rarity - b.rarity;
+
+                                // If both are non-foil, sort by highestLevel ascending (1 to 5)
+                                if (!a.isFoil && !b.isFoil) {
+                                    // Handle cases where highestLevel might be missing or null
+                                    const levelA = a.highestLevel !== undefined && a.highestLevel !== null ? a.highestLevel : Infinity;
+                                    const levelB = b.highestLevel !== undefined && b.highestLevel !== null ? b.highestLevel : Infinity;
+                                    if (levelA !== levelB) {
+                                        return levelA - levelB;
+                                    }
+                                    // If levels are the same or missing, sort by scarcity
+                                     const scarcityA = a.scarcity !== undefined && a.scarcity !== null ? a.scarcity : Infinity;
+                                     const scarcityB = b.scarcity !== undefined && b.scarcity !== null ? b.scarcity : Infinity;
+                                     if (scarcityA !== scarcityB) {
+                                         return scarcityA - scarcityB;
                                      }
-                                      return (a.name || '').localeCompare(b.name || '');
                                 }
-                                // Sort non-foil badges by scarcity ascending if available, otherwise by name
-                                if (a.scarcity !== undefined && b.scarcity !== undefined) {
-                                     return a.scarcity - b.scarcity;
+
+                                // If both are foil, sort by rarity ascending if available, otherwise scarcity, otherwise name
+                                if (a.isFoil && b.isFoil) {
+                                     const rarityA = a.rarity !== undefined && a.rarity !== null ? a.rarity : Infinity;
+                                     const rarityB = b.rarity !== undefined && b.rarity !== null ? b.rarity : Infinity;
+                                     if (rarityA !== rarityB) {
+                                         return rarityA - rarityB;
+                                     }
+                                      const scarcityA = a.scarcity !== undefined && a.scarcity !== null ? a.scarcity : Infinity;
+                                      const scarcityB = b.scarcity !== undefined && b.scarcity !== null ? b.scarcity : Infinity;
+                                      if (scarcityA !== scarcityB) {
+                                          return scarcityA - scarcityB;
+                                      }
                                 }
-                                 return (a.name || '').localeCompare(b.name || '');
+
+                                // Fallback: Sort by name if other criteria are the same or missing
+                                return (a.name || '').localeCompare(b.name || '');
                             });
 
 
