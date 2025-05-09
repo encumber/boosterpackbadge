@@ -1,10 +1,11 @@
 // ==UserScript==
-// @name         Steam Badge Info for Booster Creator with favorites list 
+// @name         Steam Badge Info for Booster Creator
 // @namespace    https://github.com/encumber/
-// @version      1.15 // Increment version for refined unlocked info selection
+// @version      1.29
 // @description  Injects badge information into the booster creator page using a user-defined ID. Includes a favorites list using IndexedDB and Steam-styled controls. Caches SteamSets API data using IndexedDB with a 1-week timeout. Adds import/export for favorites. Displays badge unlock date if available.
 // @author       Nitoned
 // @match        https://steamcommunity.com/tradingcards/boostercreator/*
+// @match        https://steamcommunity.com//tradingcards/boostercreator/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -25,7 +26,7 @@ const USER_STEAM_ID = "client"; // <--- PUT YOUR STEAM ID HERE
 // steamsets api key for listing all badge icons
 // If you are getting 401 errors, double-check your key on the SteamSets website.
 // It's possible the key expired, was revoked, or you copied it correctly.
-const SteamSetsAPI = ""; // <--- PUT YOUR SteamSets API KEY HERE - you can get it from https://steamsets.com/settings/developer-apps
+const SteamSetsAPI = ""; // <--- PUT YOUR SteamSets API KEY HERE
 
 // Set this to 'true' if the USER_STEAM_ID you entered is a SteamID64.
 // Set this to 'false' if the USER_STEAM_ID you entered is a custom URL name.
@@ -974,7 +975,7 @@ const API_CACHE_TIMEOUT_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
                 rgba(255, 255, 255, 0.1) 50%,
                 rgba(0, 0, 0, 0.1) 100%
             );
-            animation: shine 3s linear infinite;
+            animation: shine 3000s linear infinite;
             border: 1px solid rgba(255, 255, 255, 0.1);
             box-shadow: 0 0 15px rgba(255, 255, 245, 0.1);
         }
